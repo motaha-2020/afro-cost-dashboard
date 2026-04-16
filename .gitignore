@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+*.log
+
+# Scraped / sample data — keep out of version control
+sample of input File csv/
+sample of File after cleaning and anlysis/
+Cost_scraped/
+*.xlsx
+
+# Streamlit secrets (if you add credentials later)
+.streamlit/secrets.toml
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db

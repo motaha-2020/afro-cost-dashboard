@@ -1,0 +1,256 @@
+{
+  "project": {
+    "name": "Afro Group — Cost Analysis Dashboard",
+    "description": "End-to-end data pipeline: scrape cost data from Afro ERP → clean & categorise → interactive Streamlit dashboard",
+    "erp_url": "https://sys.afro-group.com/Afroerp/Layout/Dashboard/operation/work%20order/Work_Order.php",
+    "local_run_command": "python -m streamlit run dashboard.py --server.port 8501",
+    "status": "fully working locally — deployment pending"
+  },
+
+  "files": {
+    "scraper.py": {
+      "purpose": "Selenium (Firefox) scraper — logs into ERP, selects all projects, downloads one CSV per expense category, returns combined DataFrame",
+      "public_api": "scrape_cost_data(date_from, date_to, output_dir, username, password, access_code) -> pd.DataFrame",
+      "helper_also_used_by_dashboard": "_load_csvs_to_dataframe(folder: Path) -> pd.DataFrame",
+      "key_constants": {
+        "WAIT_TIMEOUT": 60,
+        "TABLE_WAIT": 120,
+        "DOWNLOAD_TIMEOUT": 30,
+        "PAGE_LOAD_PAUSE": 5
+      },
+      "credential_resolution": "parameter → env var (AFRO_USER / AFRO_PASS / AFRO_ACCESS) → hard-coded default",
+      "erp_nav_flow": [
+        "1. Login (user/pass + access code)",
+        "2. Budget menu → Project Cost",
+        "3. Select ALL projects, set date range, click Execute",
+        "4. Wait up to 120s for DataTable to render (TABLE_WAIT)",
+        "5. Switch page-length to 100 via JS injection",
+        "6. Collect all link hrefs (avoids StaleElementReferenceException)",
+        "7. Open each href in a new tab via window.open()",
+        "8. Per tab: click CSV button, wait for new file, move to output_dir"
+      ],
+      "decisions_and_fixes": [
+        "TABLE_WAIT=120 separate from general WAIT_TIMEOUT=60 — ERP takes 60-90s to render results table",
+        "Collect hrefs BEFORE opening tabs to avoid StaleElementReferenceException",
+        "Use window.open() instead of .click() on link elements",
+        "_wait_for_new_csv() detects any new CSV in download folder (diff of before/after sets) — NOT hard-coded 'AFROerp.csv' because ERP changed filename format",
+        "ERP current filename format: 'Record of monthly Journal Entry for Settlement Category _CategoryName _..csv'",
+        "ERP old filename format: 'Record of monthly Journal Entry for Settlement Category _CategoryName __.csv'",
+        "Skip duplicate saves: if dest already exists → discard re-download, do not create _i copies",
+        "_load_csvs_to_dataframe deduplicates on (JE No., Project, JE Date, Debit, Credit) — keeps first occurrence",
+        "Dedup removed 1,621 duplicate rows in test run (3,469 raw → 1,848 unique)",
+        "'.' allowed in filename sanitisation so 'Dep. Installation Tools' stays intact"
+      ]
+    },
+
+    "cleaner.py": {
+      "purpose": "Pandas cleaning pipeline — normalises raw ERP CSVs into analysis-ready DataFrame",
+      "public_api": "clean_cost_data(df: pd.DataFrame) -> pd.DataFrame",
+      "pipeline_steps": [
+        "1. _drop_unused_columns  — drops '#' and 'Details'",
+        "2. _extract_item         — regex on Source.Name filename to get expense item name",
+        "3. _parse_dates          — parses '31 Jan 26' format (%d %b %y), derives Year/month/Quarter",
+        "4. _parse_numeric        — removes commas, casts Debit/Credit to float, computes Cost amount = Debit - Credit",
+        "5. _map_category         — item → Category via CATEGORY_MAP; LG-number fallback → 'Finance Cost'",
+        "6. _map_account          — Project → Account via ACCOUNT_MAP",
+        "7. _compute_pct          — % = row Cost amount / total Cost amount"
+      ],
+      "output_columns": [
+        "Project", "JE Date", "JE No.", "Debit", "Credit", "JE net Amount",
+        "item", "Year", "month", "Quarter", "Cost amount", "Category", "Account", "%"
+      ],
+      "item_extraction_regex": {
+        "primary": "_(.+?) _[_\\.]  — handles BOTH new (_.) and old (__) ERP filename formats",
+        "fallback_1": "_(.+?)__  — old double-underscore format without trailing space",
+        "fallback_2": "\\[(.*?)\\]  — original bracket pattern (legacy)"
+      },
+      "date_format": "%d %b %y  (e.g. '31 Jan 26')",
+      "known_unmapped_items_added_during_project": [
+        "Dep. laptop  → IT  (ERP uses lowercase 'l', map only had 'Dep.Laptop')",
+        "Dep_ Installation Tools → Tools  (scraper sanitised '.' to '_')",
+        "Dep_ Safety Tools → Safety",
+        "Dep_ laptop → IT",
+        "G_A-Printing → G&A",
+        "G_A-Transportation → G&A",
+        "G.A-Printing → G&A",
+        "G.A-Transportation → G&A"
+      ],
+      "category_map_size": "~65 entries",
+      "account_map_size": "~28 entries",
+      "accounts_in_use": ["WE", "Vodafone", "Orange", "Raya", "ASIS", "Nokia", "New Account & Sales"],
+      "categories_in_use": [
+        "HR", "Material", "Subcontractors", "Fleet", "Local workforce",
+        "Other Expenses", "Tools", "Warehouse", "Transportation", "Logistic",
+        "IT", "Finance Cost", "Flat Office rent", "G&A", "Tips",
+        "Safety", "Stock Adjustment", "Operation -Other revenue", "Penalties"
+      ]
+    },
+
+    "dashboard.py": {
+      "purpose": "Streamlit + Plotly interactive dashboard with 4-step sidebar workflow",
+      "framework": "Streamlit",
+      "charting": "Plotly Express + Plotly Graph Objects",
+      "sidebar_steps": {
+        "step_1_credentials": {
+          "fields": ["Username (text)", "Password (password type)", "Access Code (password type)"],
+          "note": "Password required before Scrape button is enabled"
+        },
+        "step_2_data_source": {
+          "options": [
+            "Existing CSV folder — text input for path + Load & Clean button",
+            "Run scraper (live ERP) — date range, output folder, Clear checkbox + Scrape & Clean button"
+          ],
+          "clear_before_scraping_checkbox": "default ON — prevents duplicate accumulation across runs"
+        },
+        "step_3_cleaning": {
+          "note": "Runs automatically after load/scrape via _do_clean()",
+          "shows": "row count, duplicate rows removed, unmapped category/account warnings"
+        },
+        "step_4_filters": {
+          "filters": ["Account (multiselect)", "Category (multiselect)", "Month (multiselect)", "Item (multiselect)", "Project (multiselect)"],
+          "note": "All filters react together and update all KPIs and charts"
+        }
+      },
+      "kpi_row": ["Total Cost (EGP)", "Transaction count", "Top Account", "Top Category"],
+      "chart_sections": [
+        "Cost Breakdown: Cost by Account (horizontal bar, brand colours) + Cost by Category (donut)",
+        "Trends & Distribution: Monthly Cost by Account (stacked bar) + Account×Category Heatmap",
+        "Category & Item Detail: Category Cost by Account (stacked bar) + Top 15 Expense Items (table)",
+        "Account Share Analysis: % share bar per account",
+        "Project Drilldown: top 30 projects filterable by account (horizontal bar coloured by category)",
+        "Raw Data: expandable table + CSV download button"
+      ],
+      "brand_colors": {
+        "WE": "#0070C0",
+        "Vodafone": "#E60000",
+        "Orange": "#FF6600",
+        "Raya": "#7030A0",
+        "ASIS": "#00B050",
+        "Nokia": "#124191",
+        "New Account & Sales": "#00B0C1"
+      },
+      "session_state_key": "df  — stores cleaned DataFrame so filters don't re-trigger load"
+    },
+
+    "launch_config": {
+      "path": ".claude/launch.json",
+      "command": "python -m streamlit run dashboard.py --server.port 8501 --server.headless true"
+    }
+  },
+
+  "data_pipeline": {
+    "raw_csv_columns": ["#", "Project", "JE Date", "JE No.", "Debit", "Credit", "JE net Amount", "Details"],
+    "source_name_column": "Source.Name — added by _load_csvs_to_dataframe, contains the CSV filename used for item extraction",
+    "erp_filename_pattern": "Record of monthly Journal Entry for Settlement Category _<ItemName> _..csv",
+    "erp_filename_pattern_old": "Record of monthly Journal Entry for Settlement Category _<ItemName> __.csv",
+    "one_file_per": "expense category (NOT per project) — each ERP tab = one category page",
+    "deduplication_key_columns": ["JE No.", "Project", "JE Date", "Debit", "Credit"],
+    "typical_row_counts": {
+      "jan_2026_categories": 59,
+      "jan_feb_2026_raw": "~1173 (before dedup fix)",
+      "jan_2026_unique": 1184,
+      "jan_feb_2026_unique": 1848
+    }
+  },
+
+  "bugs_fixed_during_project": [
+    {
+      "bug": "TABLE_WAIT too short",
+      "symptom": "Scraper timed out waiting for results table",
+      "fix": "Added TABLE_WAIT=120 separate from WAIT_TIMEOUT=60"
+    },
+    {
+      "bug": "StaleElementReferenceException on tab links",
+      "symptom": "Crash when clicking category links",
+      "fix": "Collect all hrefs first, then open with window.open()"
+    },
+    {
+      "bug": "item = None on all scraped rows",
+      "symptom": "Category = Unknown for all rows after scraping",
+      "root_cause": "ERP changed filename suffix from '__' to '_.' — regex _(.+?)__ never matched",
+      "fix": "Updated regex to _(.+?) _[_\\.] which handles both formats"
+    },
+    {
+      "bug": "Dep. laptop → Unknown category",
+      "symptom": "247 rows with Unknown category",
+      "root_cause": "CATEGORY_MAP had 'Dep.Laptop' (uppercase L) but ERP exports 'Dep. laptop' (lowercase, space)",
+      "fix": "Added 'Dep. laptop': 'IT' to CATEGORY_MAP"
+    },
+    {
+      "bug": "Duplicate rows inflating dataset",
+      "symptom": "3469 rows instead of ~1184 after multiple scrape runs",
+      "root_cause": "Browser re-downloads same CSVs on each scrape run, accumulating in output folder",
+      "fix": "Three layers: (1) row-level dedup on JE No.+Project+JE Date+Debit+Credit; (2) scraper skips saving if file exists; (3) dashboard 'Clear folder before scraping' checkbox"
+    },
+    {
+      "bug": "Heatmap KeyError line 330",
+      "symptom": "Dashboard crashed on heatmap chart",
+      "fix": "Changed heat_df[...index] (column indexing) to heat_df.loc[...index] (row indexing)"
+    },
+    {
+      "bug": "Hard-coded 'AFROerp.csv' download wait",
+      "symptom": "Every download appeared to time out; files were saved by browser with ERP name",
+      "fix": "Replaced _wait_for_file('AFROerp.csv') with _wait_for_new_csv() that detects any new CSV by set diff"
+    },
+    {
+      "bug": "Date parsing failure",
+      "symptom": "JE Date all NaT",
+      "fix": "Added format='%d %b %y' as primary parser (e.g. '31 Jan 26')"
+    }
+  ],
+
+  "pending_tasks": [
+    {
+      "task": "Deploy app for team sharing",
+      "options": [
+        {
+          "platform": "Streamlit Community Cloud (streamlit.io/cloud)",
+          "pros": "Free, easiest, built for Streamlit, shareable URL",
+          "cons": "Code must be on GitHub; ERP scraper won't work (no browser/Selenium); CSV upload flow works fine",
+          "best_for": "Dashboard + CSV upload only (no live scraping)"
+        },
+        {
+          "platform": "Docker on a VPS / company server",
+          "pros": "Full pipeline works including Selenium scraper; team access via IP or domain",
+          "cons": "Requires server setup, Docker, nginx/SSL",
+          "best_for": "Full pipeline including live ERP scraping"
+        },
+        {
+          "platform": "Azure App Service / AWS EC2",
+          "pros": "Scalable, cloud-managed",
+          "cons": "Cost; Selenium needs headless Firefox + geckodriver installed",
+          "best_for": "Production-grade deployment"
+        }
+      ],
+      "recommendation": "If team only needs to view dashboards from CSV files → Streamlit Cloud. If team needs live ERP scraping → Docker on a VPS or company server.",
+      "status": "NOT YET DONE — user requested at end of conversation"
+    }
+  ],
+
+  "environment": {
+    "python": "3.13",
+    "key_packages": ["streamlit", "selenium", "pandas", "plotly", "geckodriver (Firefox)"],
+    "erp_browser": "Firefox via geckodriver",
+    "os": "Windows 10/11",
+    "default_download_dir": "C:/Users/HP/Downloads",
+    "default_scrape_output": "C:/Users/HP/Downloads/Cost_scraped"
+  },
+
+  "conversation_decisions": [
+    "Credentials (username, password, access_code) passed as parameters — never hard-coded in dashboard; sidebar inputs in Step 1",
+    "Cleaner runs automatically after every load/scrape — no separate 'Clean' button needed",
+    "Item filter added to sidebar (Step 4) alongside Account, Category, Month, Project",
+    "Project filter added to sidebar after user explicitly requested it",
+    "Dashboard uses dark chart theme (#0e1117 backgrounds) matching Streamlit dark mode",
+    "Cost amount = Debit - Credit (not JE net Amount) — more accurate for expense analysis",
+    "% computed from Cost amount total, NOT JE net Amount total",
+    "Unknown Category uses string 'Unknown', not NaN — easier to filter/count",
+    "LG-number items (Com LG XXXXXX) not in explicit CATEGORY_MAP fall back to 'Finance Cost'",
+    "Duplicate files: skip save (not _i suffix) to prevent dataset inflation",
+    "Dashboard shows dedup stats in Step 3 status message when duplicates are removed"
+  ],
+
+  "how_to_resume_in_new_chat": {
+    "instruction": "Load this JSON file as context. The project is at E:/Claud code/Afro Autaomation/. Three files: scraper.py, cleaner.py, dashboard.py. Run: python -m streamlit run dashboard.py. The immediate next task is deployment — see pending_tasks section."
+  }
+}
