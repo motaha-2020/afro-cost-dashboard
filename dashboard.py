@@ -148,8 +148,9 @@ with st.sidebar:
         '<p class="step-label"><span class="step-badge">2</span>Data Source</p>',
         unsafe_allow_html=True,
     )
-    _source_options = ["Existing CSV folder"]
+    _source_options = ["Upload CSV files"]
     if SCRAPER_AVAILABLE:
+        _source_options.append("CSV folder path (local)")
         _source_options.append("Run scraper (live ERP)")
     data_source = st.radio(
         "Load data from",
@@ -157,12 +158,52 @@ with st.sidebar:
         horizontal=False,
     )
     if not SCRAPER_AVAILABLE:
-        st.caption("ℹ️ Live scraping unavailable on this deployment — use CSV folder.")
+        st.caption("ℹ️ Live scraping unavailable on this deployment — upload your CSV files.")
 
     status_box = st.empty()   # placeholder for step-3 cleaning status
 
-    # ── 2a  Existing folder ───────────────────────────────────────────────────
-    if data_source == "Existing CSV folder":
+    # ── 2a  Upload CSV files (works on cloud & local) ─────────────────────────
+    if data_source == "Upload CSV files":
+        uploaded_files = st.file_uploader(
+            "Upload ERP CSV files",
+            type="csv",
+            accept_multiple_files=True,
+            help="Upload the CSV files exported from the ERP scraper.",
+        )
+
+        if st.button("📂 Load & Clean", type="primary", use_container_width=True,
+                     disabled=not uploaded_files):
+            if not uploaded_files:
+                st.error("Please upload at least one CSV file.")
+            else:
+                with st.spinner("Step 2 — Loading CSVs …"):
+                    import io
+                    frames = []
+                    for f in uploaded_files:
+                        try:
+                            df_f = pd.read_csv(f, encoding="utf-8-sig")
+                            df_f["Source.Name"] = f.name
+                            frames.append(df_f)
+                        except Exception:
+                            pass
+                    if not frames:
+                        raw = pd.DataFrame()
+                    else:
+                        raw = pd.concat(frames, ignore_index=True)
+                        dedup_keys = ["JE No.", "Project", "JE Date", "Debit", "Credit"]
+                        existing = [c for c in dedup_keys if c in raw.columns]
+                        if existing:
+                            raw = raw.drop_duplicates(subset=existing, keep="first")
+
+                if raw.empty:
+                    st.error("No valid CSV files found in the uploaded files.")
+                else:
+                    st.success(f"📄 Loaded **{len(raw):,} unique rows** from {len(uploaded_files)} files")
+                    cleaned = _do_clean(raw, status_box)
+                    st.session_state["df"] = cleaned
+
+    # ── 2b  Existing folder (local only) ──────────────────────────────────────
+    elif data_source == "CSV folder path (local)":
         default_folder = str(Path.home() / "Downloads" / "Cost_01-2026")
         folder_path = st.text_input("CSV folder path", value=default_folder)
 
