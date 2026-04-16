@@ -236,6 +236,7 @@ with st.sidebar:
         out_dir = st.text_input(
             "Save CSVs to",
             value=str(Path.home() / "Downloads" / "Cost_scraped"),
+            help="On cloud server: /root/Downloads/Cost_scraped",
         )
         clear_first = st.checkbox(
             "🗑️ Clear output folder before scraping",

@@ -493,7 +493,21 @@ def scrape_cost_data(
     log.info("Output folder: %s", out_dir)
     log.info("=" * 60)
 
-    driver = webdriver.Firefox()
+    # Build Firefox options — run headless on Linux servers (no display)
+    options = webdriver.FirefoxOptions()
+    import platform, os as _os
+    if platform.system() != "Windows" or _os.environ.get("HEADLESS"):
+        options.add_argument("--headless")
+
+    # Tell Firefox where to save downloads (Linux path or Windows path)
+    dl_path = str(download_dir)
+    options.set_preference("browser.download.folderList", 2)
+    options.set_preference("browser.download.dir", dl_path)
+    options.set_preference("browser.download.useDownloadDir", True)
+    options.set_preference("browser.helperApps.neverAsk.saveToDisk", "text/csv,application/csv,application/octet-stream")
+    options.set_preference("browser.download.manager.showWhenStarting", False)
+
+    driver = webdriver.Firefox(options=options)
     wait   = WebDriverWait(driver, WAIT_TIMEOUT)
 
     try:
