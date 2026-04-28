@@ -108,9 +108,9 @@ fi
 
 # ── 6. Configure UFW firewall ─────────────────────────────────────────────────
 if command -v ufw &>/dev/null; then
-    log "Opening firewall ports 8000 and 8501…"
-    ufw allow 8000/tcp  comment "Afro ERP Control Panel" || true
-    ufw allow 8501/tcp  comment "Afro ERP Dashboard"     || true
+    log "Opening firewall ports 8800 and 8801…"
+    ufw allow 8800/tcp  comment "Afro ERP Control Panel" || true
+    ufw allow 8801/tcp  comment "Afro ERP Dashboard"     || true
     ufw --force enable  || true
 fi
 
@@ -165,8 +165,8 @@ echo "  ╔═══════════════════════
 echo "  ║   Deployment complete!                                       ║"
 echo "  ╠══════════════════════════════════════════════════════════════╣"
 echo "  ║                                                              ║"
-echo -e "  ║   Control Panel  →  http://${SERVER_IP}:8000           ║"
-echo -e "  ║   Dashboard      →  http://${SERVER_IP}:8501           ║"
+echo -e "  ║   Control Panel  →  http://${SERVER_IP}:8800           ║"
+echo -e "  ║   Dashboard      →  http://${SERVER_IP}:8801           ║"
 echo "  ║                                                              ║"
 echo "  ║   docker compose logs -f api        (API logs)              ║"
 echo "  ║   docker compose logs -f dashboard  (Dashboard logs)        ║"

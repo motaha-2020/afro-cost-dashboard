@@ -352,11 +352,11 @@
       </div>
 
       <!-- Dashboard link -->
-      <a class="dash-link" href="http://localhost:8501" target="_blank" id="dash-link">
+      <a class="dash-link" href="" target="_blank" id="dash-link">
         <span class="icon"><i class="bi bi-bar-chart-line-fill"></i></span>
         <div>
           <div class="txt-main">Open Analysis Dashboard</div>
-          <div class="txt-sub">Streamlit dashboard — port 8501</div>
+          <div class="txt-sub">Streamlit dashboard — port 8801</div>
         </div>
         <i class="bi bi-arrow-up-right ms-auto" style="color:var(--muted)"></i>
       </a>
@@ -584,6 +584,10 @@ async function checkApi() {
       API offline`;
   }
 }
+
+// ── Dashboard link: same host, port 8801 ─────────────────────────────────────
+document.getElementById('dash-link').href =
+  `${location.protocol}//${location.hostname}:8801`;
 
 // ── On page load ──────────────────────────────────────────────────────────────
 (async () => {
