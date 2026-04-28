@@ -67,18 +67,41 @@ cd "$APP_DIR"
 if [ ! -f "$APP_DIR/.env" ]; then
     warn ".env file not found — creating from .env.example"
     cp "$APP_DIR/.env.example" "$APP_DIR/.env"
-    echo ""
-    echo "  ┌─────────────────────────────────────────────┐"
-    echo "  │  Enter your ERP credentials:                │"
-    echo "  └─────────────────────────────────────────────┘"
-    read -rp "  ERP Username  [motaha]: " erp_user
-    erp_user=${erp_user:-motaha}
-    read -rsp "  ERP Password: " erp_pass; echo
-    read -rsp "  Access Code : " erp_access; echo
-    sed -i "s/^AFRO_USER=.*/AFRO_USER=$erp_user/"   "$APP_DIR/.env"
-    sed -i "s/^AFRO_PASS=.*/AFRO_PASS=$erp_pass/"   "$APP_DIR/.env"
-    sed -i "s/^AFRO_ACCESS=.*/AFRO_ACCESS=$erp_access/" "$APP_DIR/.env"
-    log ".env saved."
+
+    # Only prompt if running in an interactive terminal (not WinSCP console)
+    if [ -t 0 ]; then
+        echo ""
+        echo "  ┌─────────────────────────────────────────────┐"
+        echo "  │  Enter your ERP credentials:                │"
+        echo "  └─────────────────────────────────────────────┘"
+        read -rp "  ERP Username  [motaha]: " erp_user
+        erp_user=${erp_user:-motaha}
+        read -rsp "  ERP Password: " erp_pass; echo
+        read -rsp "  Access Code : " erp_access; echo
+
+        # Use printf + awk to avoid sed breaking on special characters
+        python3 -c "
+import re, sys
+env = open('$APP_DIR/.env').read()
+env = re.sub(r'^AFRO_USER=.*',  'AFRO_USER=$erp_user',   env, flags=re.M)
+env = re.sub(r'^AFRO_PASS=.*',  'AFRO_PASS=$erp_pass',   env, flags=re.M)
+env = re.sub(r'^AFRO_ACCESS=.*','AFRO_ACCESS=$erp_access',env, flags=re.M)
+open('$APP_DIR/.env','w').write(env)
+"
+        log ".env saved."
+    else
+        warn "Non-interactive terminal detected — skipping credential prompt."
+        warn "Edit $APP_DIR/.env manually then re-run:  docker compose up -d --build"
+        echo ""
+        echo "  Quick copy-paste to set credentials:"
+        echo "  ─────────────────────────────────────"
+        echo "  cat > $APP_DIR/.env << 'ENVEOF'"
+        echo "  AFRO_USER=motaha"
+        echo "  AFRO_PASS=YOUR_PASSWORD_HERE"
+        echo "  AFRO_ACCESS=123456"
+        echo "  ENVEOF"
+        echo ""
+    fi
 else
     log ".env already exists — skipping credential prompt."
 fi
