@@ -1,0 +1,52 @@
+version: "3.9"
+
+# ── Shared build ──────────────────────────────────────────────────────────────
+x-base: &base
+  build: .
+  restart: unless-stopped
+  env_file:
+    - .env          # optional: AFRO_USER / AFRO_PASS / AFRO_ACCESS
+  environment:
+    - HEADLESS=1    # force headless Firefox on the server
+  volumes:
+    - db-data:/app/data          # SQLite file shared between both services
+    - dl-cache:/root/Downloads   # scraper download folder
+
+services:
+
+  # ── FastAPI + HTML control page  (port 8000) ─────────────────────────────
+  api:
+    <<: *base
+    container_name: afro_api
+    command: >
+      uvicorn api:app
+      --host 0.0.0.0
+      --port 8000
+      --workers 1
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Streamlit dashboard  (port 8501) ─────────────────────────────────────
+  dashboard:
+    <<: *base
+    container_name: afro_dashboard
+    command: >
+      python -m streamlit run dashboard.py
+      --server.port=8501
+      --server.address=0.0.0.0
+      --server.headless=true
+      --server.fileWatcherType=none
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  db-data:    # persistent SQLite database
+  dl-cache:   # temporary CSV downloads (cleared on each scrape run)

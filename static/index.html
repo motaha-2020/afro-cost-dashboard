@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Afro Group — ERP Control Panel</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --bg:        #0e1117;
+      --surface:   #1a1f2e;
+      --border:    #2a3050;
+      --accent:    #0070c0;
+      --accent-h:  #0058a3;
+      --success:   #00b050;
+      --danger:    #e63946;
+      --warning:   #ffc107;
+      --text:      #e0e4f0;
+      --muted:     #8892b0;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .top-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .top-bar .brand {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: .5px;
+      color: #fff;
+    }
+    .top-bar .sub {
+      color: var(--muted);
+      font-size: .85rem;
+    }
+    .top-bar .badge-api {
+      margin-left: auto;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: .75rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .card-header {
+      background: transparent;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: .85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      padding: 12px 18px;
+    }
+    .card-body { padding: 20px 18px; }
+
+    /* ── Form controls ── */
+    .form-control, .form-select {
+      background: #111827;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 7px;
+      font-size: .9rem;
+    }
+    .form-control:focus, .form-select:focus {
+      background: #111827;
+      border-color: var(--accent);
+      color: var(--text);
+      box-shadow: 0 0 0 3px rgba(0,112,192,.25);
+    }
+    .form-label {
+      font-size: .82rem;
+      color: var(--muted);
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      font-weight: 600;
+      letter-spacing: .3px;
+    }
+    .btn-primary:hover { background: var(--accent-h); border-color: var(--accent-h); }
+    .btn-outline-secondary {
+      border-color: var(--border);
+      color: var(--muted);
+    }
+    .btn-outline-secondary:hover { color: #fff; border-color: #fff; background: transparent; }
+
+    /* ── KPI tiles ── */
+    .kpi-tile {
+      background: #111827;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 16px 18px;
+      text-align: center;
+    }
+    .kpi-tile .val {
+      font-size: 1.7rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.1;
+    }
+    .kpi-tile .lbl {
+      font-size: .75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      margin-top: 4px;
+    }
+
+    /* ── Progress log ── */
+    #log-box {
+      background: #080c14;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-family: "Cascadia Code", "Fira Code", monospace;
+      font-size: .82rem;
+      color: #a8c0ff;
+      min-height: 80px;
+      max-height: 220px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* ── Status badge ── */
+    .status-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+    .dot-idle    { background: var(--muted); }
+    .dot-running { background: var(--warning); animation: pulse 1.2s infinite; }
+    .dot-success { background: var(--success); }
+    .dot-error   { background: var(--danger); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .35; }
+    }
+
+    /* ── Dashboard link ── */
+    .dash-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: linear-gradient(135deg, #0e1a2e, #0d2040);
+      border: 1px solid #1a3a6e;
+      border-radius: 10px;
+      padding: 16px 20px;
+      text-decoration: none;
+      transition: border-color .2s, background .2s;
+    }
+    .dash-link:hover {
+      border-color: var(--accent);
+      background: linear-gradient(135deg, #0e1a2e, #0a2a5c);
+      text-decoration: none;
+    }
+    .dash-link .icon {
+      font-size: 1.8rem;
+      color: var(--accent);
+    }
+    .dash-link .txt-main { font-weight: 700; color: #fff; font-size: 1rem; }
+    .dash-link .txt-sub  { color: var(--muted); font-size: .8rem; }
+
+    /* ── Misc ── */
+    .divider { border-color: var(--border); margin: 24px 0; }
+    .text-muted { color: var(--muted) !important; }
+    small { color: var(--muted); }
+
+    .spinner-border-sm { width: 14px; height: 14px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Top bar ─────────────────────────────────────────────────────────────── -->
+<div class="top-bar">
+  <i class="bi bi-database-fill-gear" style="font-size:1.4rem;color:var(--accent)"></i>
+  <div>
+    <div class="brand">Afro Group — ERP Control Panel</div>
+    <div class="sub">Scrape · Clean · Store · Analyse</div>
+  </div>
+  <span class="badge-api" id="api-status">
+    <i class="bi bi-circle-fill" style="font-size:.5rem;vertical-align:middle;margin-right:4px;color:var(--muted)"></i>
+    Connecting…
+  </span>
+</div>
+
+<!-- ── Main layout ──────────────────────────────────────────────────────────── -->
+<div class="container-fluid" style="max-width:960px;padding:28px 20px">
+
+  <!-- KPI row -->
+  <div class="row g-3 mb-4" id="kpi-row">
+    <div class="col-6 col-md-3">
+      <div class="kpi-tile">
+        <div class="val" id="kpi-rows">—</div>
+        <div class="lbl">Rows in DB</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-tile">
+        <div class="val" id="kpi-status">—</div>
+        <div class="lbl">Last Sync</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-tile">
+        <div class="val" id="kpi-added">—</div>
+        <div class="lbl">Rows Added</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-tile">
+        <div class="val" id="kpi-range">—</div>
+        <div class="lbl">Date Range</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- ── Left column: Credentials + Dates + Button ── -->
+    <div class="col-md-6">
+
+      <!-- Credentials -->
+      <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-shield-lock me-2"></i>ERP Credentials</div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input id="inp-user" class="form-control" value="motaha" autocomplete="username" />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input id="inp-pass" class="form-control" type="password"
+                   placeholder="ERP password" autocomplete="current-password" />
+          </div>
+          <div>
+            <label class="form-label">Access Code</label>
+            <input id="inp-access" class="form-control" type="password"
+                   placeholder="6-digit code" autocomplete="one-time-code" maxlength="10" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Date range -->
+      <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-calendar-range me-2"></i>Date Range</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label">From</label>
+              <input id="inp-from" class="form-control" type="date" value="2026-01-01" />
+            </div>
+            <div class="col-6">
+              <label class="form-label">To</label>
+              <input id="inp-to"   class="form-control" type="date" value="2026-02-28" />
+            </div>
+          </div>
+          <div class="mt-3">
+            <!-- Quick presets -->
+            <small class="d-block mb-2">Quick select:</small>
+            <div class="d-flex flex-wrap gap-2">
+              <button class="btn btn-sm btn-outline-secondary"
+                      onclick="setRange('2026-01-01','2026-01-31')">Jan 2026</button>
+              <button class="btn btn-sm btn-outline-secondary"
+                      onclick="setRange('2026-02-01','2026-02-28')">Feb 2026</button>
+              <button class="btn btn-sm btn-outline-secondary"
+                      onclick="setRange('2026-01-01','2026-03-31')">Q1 2026</button>
+              <button class="btn btn-sm btn-outline-secondary"
+                      onclick="setRange('2026-01-01','2026-06-30')">H1 2026</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrape button -->
+      <button id="btn-scrape" class="btn btn-primary w-100 py-3" onclick="startScrape()">
+        <i class="bi bi-play-circle-fill me-2"></i>Scrape &amp; Save to Database
+      </button>
+      <small class="d-block text-center mt-2">
+        The scraper opens a headless browser on the server — typically takes 5–15 min.
+      </small>
+
+    </div>
+
+    <!-- ── Right column: Status + Dashboard link ── -->
+    <div class="col-md-6 d-flex flex-column gap-4">
+
+      <!-- Live status -->
+      <div class="card">
+        <div class="card-header"><i class="bi bi-activity me-2"></i>Live Status</div>
+        <div class="card-body">
+          <div class="mb-3 d-flex align-items-center gap-2">
+            <span class="status-dot dot-idle" id="status-dot"></span>
+            <span id="status-text" style="font-size:.9rem">Ready</span>
+          </div>
+          <div id="log-box">Waiting for a scrape run…</div>
+          <div class="mt-3 d-flex justify-content-between align-items-center">
+            <small id="elapsed-text" class="text-muted"></small>
+            <button class="btn btn-sm btn-outline-secondary" onclick="refreshStatus()">
+              <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Last sync details -->
+      <div class="card" id="last-sync-card">
+        <div class="card-header"><i class="bi bi-clock-history me-2"></i>Last Sync Details</div>
+        <div class="card-body p-0">
+          <table class="table table-sm mb-0" style="color:var(--text);font-size:.85rem">
+            <tbody id="sync-table">
+              <tr><td colspan="2" class="text-center text-muted py-3">No sync yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Dashboard link -->
+      <a class="dash-link" href="http://localhost:8501" target="_blank" id="dash-link">
+        <span class="icon"><i class="bi bi-bar-chart-line-fill"></i></span>
+        <div>
+          <div class="txt-main">Open Analysis Dashboard</div>
+          <div class="txt-sub">Streamlit dashboard — port 8501</div>
+        </div>
+        <i class="bi bi-arrow-up-right ms-auto" style="color:var(--muted)"></i>
+      </a>
+
+    </div>
+  </div><!-- /row -->
+</div><!-- /container -->
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let _polling   = false;
+let _pollTimer = null;
+let _startedAt = null;
+let _elapsedTimer = null;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setRange(from, to) {
+  document.getElementById('inp-from').value = from;
+  document.getElementById('inp-to').value   = to;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-GB', {
+    day:'2-digit', month:'short', year:'numeric',
+    hour:'2-digit', minute:'2-digit'
+  });
+}
+
+function toErpDate(isoDate) {
+  // "2026-01-15" → "01/15/2026"
+  const [y, m, d] = isoDate.split('-');
+  return `${m}/${d}/${y}`;
+}
+
+function appendLog(msg) {
+  const box = document.getElementById('log-box');
+  const ts  = new Date().toLocaleTimeString('en-GB');
+  box.textContent += `[${ts}]  ${msg}\n`;
+  box.scrollTop = box.scrollHeight;
+}
+
+function setDot(state) {
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot dot-' + state;
+}
+
+function startElapsedTimer() {
+  _startedAt = Date.now();
+  clearInterval(_elapsedTimer);
+  _elapsedTimer = setInterval(() => {
+    const s = Math.floor((Date.now() - _startedAt) / 1000);
+    const m = Math.floor(s / 60).toString().padStart(2,'0');
+    const r = (s % 60).toString().padStart(2,'0');
+    document.getElementById('elapsed-text').textContent = `Elapsed: ${m}:${r}`;
+  }, 1000);
+}
+
+function stopElapsedTimer() {
+  clearInterval(_elapsedTimer);
+  _elapsedTimer = null;
+}
+
+// ── KPI / sync table update ───────────────────────────────────────────────────
+function updateSummary(data) {
+  document.getElementById('kpi-rows').textContent =
+    data.total_rows != null ? data.total_rows.toLocaleString() : '—';
+
+  const statusMap = { never:'Never', success:'✓ OK', error:'✗ Error', running:'Running…' };
+  document.getElementById('kpi-status').textContent =
+    statusMap[data.status] || data.status || '—';
+
+  document.getElementById('kpi-added').textContent =
+    data.rows_added != null ? data.rows_added.toLocaleString() : '—';
+
+  const range = (data.date_from && data.date_to)
+    ? `${data.date_from} → ${data.date_to}` : '—';
+  document.getElementById('kpi-range').textContent = range;
+
+  // Table rows
+  const tbody = document.getElementById('sync-table');
+  if (data.status === 'never') {
+    tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted py-3">No sync yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = `
+    <tr><td class="ps-3 text-muted">Started</td>
+        <td class="pe-3">${fmtDate(data.started_at)}</td></tr>
+    <tr><td class="ps-3 text-muted">Finished</td>
+        <td class="pe-3">${fmtDate(data.finished_at)}</td></tr>
+    <tr><td class="ps-3 text-muted">Status</td>
+        <td class="pe-3">${statusMap[data.status] || data.status}</td></tr>
+    <tr><td class="ps-3 text-muted">New rows</td>
+        <td class="pe-3">${data.rows_added != null ? data.rows_added.toLocaleString() : '—'}</td></tr>
+    ${data.error_msg
+      ? `<tr><td class="ps-3 text-muted">Error</td>
+             <td class="pe-3 text-danger" style="font-size:.8rem">${data.error_msg}</td></tr>`
+      : ''}
+  `;
+}
+
+// ── API: get status ───────────────────────────────────────────────────────────
+async function refreshStatus() {
+  try {
+    const res  = await fetch('/scrape/status');
+    const data = await res.json();
+
+    // Update live status text
+    document.getElementById('status-text').textContent = data.message || '—';
+
+    if (data.running) {
+      setDot('running');
+    } else if (data.error) {
+      setDot('error');
+    } else if (data.message && data.message.startsWith('Done')) {
+      setDot('success');
+    } else {
+      setDot('idle');
+    }
+
+    if (data.last_sync) updateSummary(data.last_sync);
+
+    return data;
+  } catch (e) {
+    console.warn('Status fetch failed:', e);
+    return null;
+  }
+}
+
+// ── Polling ───────────────────────────────────────────────────────────────────
+function startPolling() {
+  if (_polling) return;
+  _polling = true;
+  startElapsedTimer();
+
+  const poll = async () => {
+    const data = await refreshStatus();
+    if (data && data.running) {
+      appendLog(data.message);
+      _pollTimer = setTimeout(poll, 4000);
+    } else {
+      _polling = false;
+      stopElapsedTimer();
+      document.getElementById('btn-scrape').disabled = false;
+      if (data) {
+        appendLog(data.message || 'Scrape finished.');
+        if (data.last_sync) updateSummary(data.last_sync);
+      }
+    }
+  };
+  poll();
+}
+
+// ── API: start scrape ─────────────────────────────────────────────────────────
+async function startScrape() {
+  const user   = document.getElementById('inp-user').value.trim();
+  const pass   = document.getElementById('inp-pass').value.trim();
+  const access = document.getElementById('inp-access').value.trim();
+  const from   = document.getElementById('inp-from').value;
+  const to     = document.getElementById('inp-to').value;
+
+  if (!pass)   { alert('Please enter the ERP password.'); return; }
+  if (!access) { alert('Please enter the Access Code.'); return; }
+  if (!from || !to) { alert('Please set a valid date range.'); return; }
+
+  const btn = document.getElementById('btn-scrape');
+  btn.disabled = true;
+
+  // Clear the log
+  document.getElementById('log-box').textContent = '';
+  appendLog(`Starting scrape: ${from} → ${to}`);
+  setDot('running');
+  document.getElementById('status-text').textContent = 'Starting …';
+
+  try {
+    const res = await fetch('/scrape', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username:    user,
+        password:    pass,
+        access_code: access,
+        date_from:   toErpDate(from),
+        date_to:     toErpDate(to),
+      }),
+    });
+
+    if (res.status === 409) {
+      appendLog('⚠ A scrape is already running on the server.');
+      btn.disabled = false;
+      return;
+    }
+    if (!res.ok) {
+      const err = await res.json();
+      appendLog(`✗ Error: ${err.detail || JSON.stringify(err)}`);
+      btn.disabled = false;
+      setDot('error');
+      return;
+    }
+
+    appendLog('✓ Scrape started — polling for updates…');
+    startPolling();
+
+  } catch (e) {
+    appendLog(`✗ Network error: ${e.message}`);
+    btn.disabled = false;
+    setDot('error');
+  }
+}
+
+// ── API health check ──────────────────────────────────────────────────────────
+async function checkApi() {
+  const badge = document.getElementById('api-status');
+  try {
+    const res  = await fetch('/health');
+    const data = await res.json();
+    badge.innerHTML = `
+      <i class="bi bi-circle-fill"
+         style="font-size:.5rem;vertical-align:middle;margin-right:4px;color:var(--success)"></i>
+      API online &nbsp;·&nbsp; ${(data.db_rows || 0).toLocaleString()} rows`;
+  } catch {
+    badge.innerHTML = `
+      <i class="bi bi-circle-fill"
+         style="font-size:.5rem;vertical-align:middle;margin-right:4px;color:var(--danger)"></i>
+      API offline`;
+  }
+}
+
+// ── On page load ──────────────────────────────────────────────────────────────
+(async () => {
+  await checkApi();
+  const data = await refreshStatus();
+
+  // If a scrape is already running when we open the page, start polling
+  if (data && data.running) {
+    document.getElementById('btn-scrape').disabled = true;
+    appendLog('A scrape is already running — monitoring progress…');
+    startPolling();
+  } else {
+    document.getElementById('log-box').textContent = 'No active scrape. Fill in the form and press Scrape.';
+  }
+
+  // Refresh summary every 60 s
+  setInterval(async () => {
+    await checkApi();
+    if (!_polling) await refreshStatus();
+  }, 60_000);
+})();
+</script>
+</body>
+</html>

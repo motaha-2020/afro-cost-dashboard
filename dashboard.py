@@ -20,8 +20,16 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent))
 from cleaner import clean_cost_data
 
+# Database layer — available whenever db.py exists alongside the dashboard
+try:
+    import db as _db
+    _db.init_db()
+    DB_AVAILABLE = True
+except Exception:
+    DB_AVAILABLE = False
+
 # Scraper requires Selenium + Firefox — not available on Streamlit Cloud.
-# Dashboard still works in CSV-upload mode without it.
+# Dashboard still works in CSV-upload mode or DB mode without it.
 try:
     from scraper import scrape_cost_data, _load_csvs_to_dataframe
     SCRAPER_AVAILABLE = True
@@ -148,7 +156,10 @@ with st.sidebar:
         '<p class="step-label"><span class="step-badge">2</span>Data Source</p>',
         unsafe_allow_html=True,
     )
-    _source_options = ["Upload CSV files"]
+    _source_options = []
+    if DB_AVAILABLE:
+        _source_options.append("Database (live)")
+    _source_options.append("Upload CSV files")
     if SCRAPER_AVAILABLE:
         _source_options.append("CSV folder path (local)")
         _source_options.append("Run scraper (live ERP)")
@@ -157,13 +168,44 @@ with st.sidebar:
         _source_options,
         horizontal=False,
     )
-    if not SCRAPER_AVAILABLE:
+    if not SCRAPER_AVAILABLE and not DB_AVAILABLE:
         st.caption("ℹ️ Live scraping unavailable on this deployment — upload your CSV files.")
 
     status_box = st.empty()   # placeholder for step-3 cleaning status
 
-    # ── 2a  Upload CSV files (works on cloud & local) ─────────────────────────
-    if data_source == "Upload CSV files":
+    # ── 2a  Database (live) ───────────────────────────────────────────────────
+    if data_source == "Database (live)":
+        sync = _db.get_last_sync()
+        total_rows = sync.get("total_rows", 0)
+
+        if total_rows == 0:
+            st.warning("Database is empty — run the scraper from the Control Panel first.")
+            st.markdown("[Open Control Panel](http://localhost:8000)", unsafe_allow_html=True)
+        else:
+            last_time = sync.get("finished_at", "")[:16].replace("T", " ") if sync.get("finished_at") else "unknown"
+            st.info(f"**{total_rows:,} rows** in database  \nLast sync: {last_time}")
+
+            if st.button("🔄 Load from Database", type="primary", use_container_width=True):
+                with st.spinner("Loading from database …"):
+                    raw = _db.load_data()
+                if raw.empty:
+                    st.error("Database returned no data.")
+                else:
+                    st.success(f"📄 Loaded **{len(raw):,} rows** from database")
+                    st.session_state["df"] = raw   # already cleaned — skip cleaner
+                    status_box.success(f"✅ Data ready — **{len(raw):,} rows**, {len(raw.columns)} columns")
+
+            # Auto-load on first visit if DB has data and no df in session yet
+            if "df" not in st.session_state and total_rows > 0:
+                with st.spinner("Auto-loading from database …"):
+                    raw = _db.load_data()
+                if not raw.empty:
+                    st.session_state["df"] = raw
+                    status_box.success(f"✅ Auto-loaded **{len(raw):,} rows** from database")
+                    st.rerun()
+
+    # ── 2b  Upload CSV files (works on cloud & local) ─────────────────────────
+    elif data_source == "Upload CSV files":
         uploaded_files = st.file_uploader(
             "Upload ERP CSV files",
             type="csv",
@@ -201,6 +243,10 @@ with st.sidebar:
                     st.success(f"📄 Loaded **{len(raw):,} unique rows** from {len(uploaded_files)} files")
                     cleaned = _do_clean(raw, status_box)
                     st.session_state["df"] = cleaned
+                    if DB_AVAILABLE:
+                        new_rows = _db.save_data(cleaned)
+                        if new_rows:
+                            st.info(f"💾 Saved **{new_rows:,}** new rows to database")
 
     # ── 2b  Existing folder (local only) ──────────────────────────────────────
     elif data_source == "CSV folder path (local)":
@@ -221,6 +267,10 @@ with st.sidebar:
                     st.success(f"📄 Loaded **{len(raw):,} unique rows** from {n_files} files")
                     cleaned = _do_clean(raw, status_box)
                     st.session_state["df"] = cleaned
+                    if DB_AVAILABLE:
+                        new_rows = _db.save_data(cleaned)
+                        if new_rows:
+                            st.info(f"💾 Saved **{new_rows:,}** new rows to database")
 
     # ── 2b  Run scraper ───────────────────────────────────────────────────────
     else:
@@ -276,6 +326,10 @@ with st.sidebar:
                     st.success(f"📄 Scraped **{len(raw):,} unique rows**")
                     cleaned = _do_clean(raw, status_box)
                     st.session_state["df"] = cleaned
+                    if DB_AVAILABLE:
+                        new_rows = _db.save_data(cleaned)
+                        if new_rows:
+                            st.info(f"💾 Saved **{new_rows:,}** new rows to database")
 
     # ── Filters (shown only when data is loaded) ──────────────────────────────
     df_full: pd.DataFrame = st.session_state.get("df", pd.DataFrame())
